@@ -11,18 +11,12 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 
-class MailmanGateway
+class MailmanGateway implements MailmanGatewayInterface
 {
     /**
      * @var Client
      */
     protected $client;
-
-    /**
-     * Only used if MAILMAN_MOCK=true
-     * @var array
-     */
-    private static $mockCache = [];
 
     public function __construct($options = [])
     {
@@ -44,10 +38,6 @@ class MailmanGateway
      */
     public function subscribe($list, $email, $name = null)
     {
-        if (config('mailmansync.mock')) {
-            self::$mockCache[$list][] = $email;
-            return true;
-        }
         $subscribee = $email;
         if ($name !== null) {
             $subscribee = '"'.$name.'" <'.$email.'>';
@@ -82,10 +72,6 @@ class MailmanGateway
      */
     public function unsubscribe($list, $email)
     {
-        if (config('mailmansync.mock')) {
-            self::$mockCache = array_filter(self::$mockCache, function ($v) use ($email) {return $v !== $email;});
-            return true;
-        }
         $path = '/admin/' . $list . '/members/remove';
         $query = array(
             'send_unsub_ack_to_this_batch' => 0,
@@ -106,12 +92,6 @@ class MailmanGateway
 
     public function change($list, $emailFrom, $emailTo)
     {
-        if (config('mailmansync.mock')) {
-            self::$mockCache = array_map(
-                function ($v) use ($emailFrom, $emailTo) {return $v === $emailFrom ? $emailTo : $v;}, self::$mockCache
-            );
-            return true;
-        }
         $path = '/admin/' . $list . '/members/change';
         $query = [
             'change_from' => $emailFrom,
@@ -140,9 +120,6 @@ class MailmanGateway
      */
     public function roster($list)
     {
-        if (config('mailmansync.mock')) {
-            return self::$mockCache;
-        }
         $path = '/roster/'.$list;
         $query = [
             'adminpw' => config('mailmansync.'.$list.'.password'),
