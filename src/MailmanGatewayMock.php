@@ -7,9 +7,7 @@
  */
 namespace MailmanSync;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Response;
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Support\Facades\Storage;
 
 class MailmanGatewayMock implements MailmanGatewayInterface
 {
@@ -28,7 +26,9 @@ class MailmanGatewayMock implements MailmanGatewayInterface
      */
     public function subscribe($list, $email, $name = null)
     {
+        $this->getCache($list);
         self::$mockCache[$list][] = $email;
+        $this->writeCache($list);
         return true;
     }
 
@@ -41,15 +41,22 @@ class MailmanGatewayMock implements MailmanGatewayInterface
      */
     public function unsubscribe($list, $email)
     {
-        self::$mockCache = array_filter(self::$mockCache, function ($v) use ($email) {return $v !== $email;});
+        self::$mockCache[$list] = array_filter(
+            $this->getCache($list),
+            function ($v) use ($email) {return $v !== $email;}
+        );
+        $this->writeCache($list);
         return true;
     }
 
     public function change($list, $emailFrom, $emailTo)
     {
-        self::$mockCache = array_map(
-            function ($v) use ($emailFrom, $emailTo) {return $v === $emailFrom ? $emailTo : $v;}, self::$mockCache
+
+        self::$mockCache[$list] = array_map(
+            function ($v) use ($emailFrom, $emailTo) {return $v === $emailFrom ? $emailTo : $v;},
+            $this->getCache($list)
         );
+        $this->writeCache($list);
         return true;
     }
 
@@ -59,6 +66,23 @@ class MailmanGatewayMock implements MailmanGatewayInterface
      */
     public function roster($list)
     {
-        return self::$mockCache;
+        return $this->getCache($list);
+    }
+
+    private function getCache($list)
+    {
+        if (empty(self::$mockCache[$list]) && Storage::disk('local')->exists('mockCache.'.$list.'.txt')) {
+            self::$mockCache[$list] = array_filter(
+                explode(PHP_EOL, Storage::disk('local')->get('mockCache.'.$list.'.txt'))
+            );
+        } else {
+            self::$mockCache[$list] = [];
+        }
+        return self::$mockCache[$list];
+    }
+
+    private function writeCache($list)
+    {
+        Storage::disk('local')->put('mockCache.'.$list.'.txt', implode(PHP_EOL, self::$mockCache[$list]));
     }
 }

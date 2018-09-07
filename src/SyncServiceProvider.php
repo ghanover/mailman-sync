@@ -37,14 +37,14 @@ class SyncServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('MailmanGateway', function ($app) {
+        $this->app->singleton('MailmanSync', function ($app) {
             if (config('mailmansync.mock')) {
                 return new MailmanGatewayMock();
             }
             return new MailmanGateway();
         });
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/mailmansync.php', 'mailman'
+            __DIR__ . '/../config/mailmansync.php', 'mailmansync'
         );
     }
 }
