@@ -31,7 +31,7 @@ Register Service Provider in providers array:
 
 Config
 
-    MAILMAN_ADMIN_URL=http://your.host/mailman
+    MAILMAN_ADMIN_URL=http://your.host/mailman/
     MAILMAN_LISTS="{\"examplelist\":{\"password\":\"securepassword\"}}"
 
 ## Usage

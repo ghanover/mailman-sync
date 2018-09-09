@@ -20,8 +20,12 @@ class MailmanGateway implements MailmanGatewayInterface
 
     public function __construct($options = [])
     {
+        $baseUri = config('mailmansync.url');
+        if (substr($baseUri, -1) !== '/') {
+            $baseUri .= '/';
+        }
         $defaultOptions = [
-            'base_uri' => rtrim(config('mailmansync.url'), '/'),
+            'base_uri' => $baseUri,
             'http_errors' => false,
         ];
         $options = array_merge($options, $defaultOptions);
@@ -42,7 +46,7 @@ class MailmanGateway implements MailmanGatewayInterface
         if ($name !== null) {
             $subscribee = '"'.$name.'" <'.$email.'>';
         }
-        $path = '/admin/' . $list . '/members/add';
+        $path = 'admin/' . $list . '/members/add';
         $query = [
             'subscribe_or_invite' => 0,
             'send_welcome_msg_to_this_batch' => 0,
@@ -72,7 +76,7 @@ class MailmanGateway implements MailmanGatewayInterface
      */
     public function unsubscribe($list, $email)
     {
-        $path = '/admin/' . $list . '/members/remove';
+        $path = 'admin/' . $list . '/members/remove';
         $query = array(
             'send_unsub_ack_to_this_batch' => 0,
             'send_unsub_notifications_to_list_owner' => 0,
@@ -92,7 +96,7 @@ class MailmanGateway implements MailmanGatewayInterface
 
     public function change($list, $emailFrom, $emailTo)
     {
-        $path = '/admin/' . $list . '/members/change';
+        $path = 'admin/' . $list . '/members/change';
         $query = [
             'change_from' => $emailFrom,
             'change_to' => $emailTo,
@@ -120,7 +124,7 @@ class MailmanGateway implements MailmanGatewayInterface
      */
     public function roster($list)
     {
-        $path = '/roster/'.$list;
+        $path = 'roster/'.$list;
         $query = [
             'adminpw' => config('mailmansync.'.$list.'.password'),
         ];
