@@ -52,7 +52,7 @@ class MailmanGateway implements MailmanGatewayInterface
             'send_welcome_msg_to_this_batch' => 0,
             'send_notifications_to_list_owner' => 0,
             'subscribees' => $subscribee,
-            'adminpw' => config('mailmansync.'.$list.'.password'),
+            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
         ];
 
         $response = $this->client->get($path .'?'. http_build_query($query));
@@ -81,7 +81,7 @@ class MailmanGateway implements MailmanGatewayInterface
             'send_unsub_ack_to_this_batch' => 0,
             'send_unsub_notifications_to_list_owner' => 0,
             'unsubscribees' => $email,
-            'adminpw' => config('mailmansync.'.$list.'.password')
+            'adminpw' => config('mailmansync.lists.'.$list.'.password')
         );
         $response = $this->client->get($path .'?'. http_build_query($query));
         $this->checkResponse($response);
@@ -102,7 +102,7 @@ class MailmanGateway implements MailmanGatewayInterface
             'change_to' => $emailTo,
             'notice_old' => 0,
             'notice_new' => 0,
-            'adminpw' => config('mailmansync.'.$list.'.password'),
+            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
         ];
         $response = $this->client->get($path.'?'.http_build_query($query));
 
@@ -126,7 +126,7 @@ class MailmanGateway implements MailmanGatewayInterface
     {
         $path = 'roster/'.$list;
         $query = [
-            'adminpw' => config('mailmansync.'.$list.'.password'),
+            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
         ];
         $response = $this->client->get($path.'?'.http_build_query($query));
 
