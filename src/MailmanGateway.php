@@ -8,6 +8,8 @@
 namespace MailmanSync;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Cookie\CookieJar;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 
@@ -27,7 +29,6 @@ class MailmanGateway implements MailmanGatewayInterface
         $defaultOptions = [
             'base_uri' => $baseUri,
             'http_errors' => false,
-            'cookies' => true,
         ];
         $options = array_merge($options, $defaultOptions);
         $this->client = new Client($options);
@@ -125,19 +126,28 @@ class MailmanGateway implements MailmanGatewayInterface
      */
     public function roster($list)
     {
+        $jar = new CookieJar();
         $path = 'roster/'.$list;
         $query = [
             'adminpw' => config('mailmansync.lists.'.$list.'.password'),
+            'admlogin' => 'Let me in...',
         ];
-        $this->client->get('admin/'.$list.'?'.http_build_query($query));
-        $response = $this->client->get($path);
+        $this->client->request('POST', 'admin/'.$list, ['form_params' => $query, 'cookies' => $jar]);
+
+        $response = $this->client->get(
+            $path,
+            [
+                'cookies' => $jar,
+                'headers' => ['Cookie' => $list.'+admin='.$jar->getCookieByName($list.'+admin')->getValue()]
+            ]
+        );
 
         $this->checkResponse($response);
 
         $html = $response->getBody()->getContents();
 
         $members = [];
-        if (preg_match_all('~<a href="../options/'.$list.'/([^"]+)">([^<]+)</a>~', $html, $m)) {
+        if (preg_match_all('~<a href="(?:[^"]*)/options/'.$list.'/([^"]+)">([^<]+)</a>~', $html, $m)) {
             $members = str_replace(' at ', '@', $m[2]);
         }
         return $members;
