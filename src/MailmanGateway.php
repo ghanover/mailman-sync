@@ -27,6 +27,7 @@ class MailmanGateway implements MailmanGatewayInterface
         $defaultOptions = [
             'base_uri' => $baseUri,
             'http_errors' => false,
+            'cookies' => true,
         ];
         $options = array_merge($options, $defaultOptions);
         $this->client = new Client($options);
@@ -128,7 +129,8 @@ class MailmanGateway implements MailmanGatewayInterface
         $query = [
             'adminpw' => config('mailmansync.lists.'.$list.'.password'),
         ];
-        $response = $this->client->get($path.'?'.http_build_query($query));
+        $this->client->get('admin/'.$list.'?'.http_build_query($query));
+        $response = $this->client->get($path);
 
         $this->checkResponse($response);
 
