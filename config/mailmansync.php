@@ -1,7 +1,7 @@
 <?php
 $lists = null;
 if (env('MAILMAN_LISTS')) {
-    $lists = json_decode(env('MAILMAN_LISTS'));
+    $lists = json_decode(env('MAILMAN_LISTS'), true);
 }
 return [
     'url' => env('MAILMAN_ADMIN_URL', 'http://localhost/mailman'),
