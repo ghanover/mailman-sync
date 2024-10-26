@@ -9,8 +9,10 @@ namespace MailmanSync;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
 
 class MailmanGateway implements MailmanGatewayInterface
@@ -19,6 +21,60 @@ class MailmanGateway implements MailmanGatewayInterface
      * @var Client
      */
     protected $client;
+
+    private function _authHeader($list): array
+    {
+        return [config('mailmansync.lists')[$list]['user'], config('mailmansync.lists')[$list]['password']];
+    }
+
+    /**
+     * @throws GuzzleException
+     */
+    private function _execRequest($list, $method, $path, $options = [])
+    {
+        $response = $this->_execRawRequest($list, $method, $path, $options);
+
+        return json_decode($response->getBody()->getContents(), false);
+    }
+
+    /**
+     * @param $list
+     * @param $method
+     * @param $path
+     * @param array $options
+     * @return ResponseInterface
+     * @throws GuzzleException
+     */
+    private function _execRawRequest($list, $method, $path, array $options = []): ResponseInterface
+    {
+        $options = array_merge($options, [RequestOptions::AUTH => $this->_authHeader($list)]);
+        $response = $this->client->request($method, $path, $options);
+        if ($response->getStatusCode() == 401) {
+            throw new \InvalidArgumentException('Invalid Admin Credentials');
+        }
+        return $response;
+    }
+
+    /**
+     * @throws GuzzleException
+     */
+    private function _getMembershipId($list, $email): string
+    {
+        $path = 'addresses/'. $email . '/memberships';
+
+        $obj = $this->_execRequest($list, 'GET', $path);
+
+        if (empty($obj->entries)) {
+            throw new \InvalidArgumentException($email . ' is not a member or invalid response');
+        }
+        foreach ($obj->entries as $entry) {
+            if ($entry->list_id == $list) {
+                // $entry->member_id is a bigint, which doesn't work in PHP, parse the string from self_link instead
+                return basename($entry->self_link);
+            }
+        }
+        throw new \InvalidArgumentException($email . ' is not a member or invalid response');
+    }
 
     public function __construct($options = [])
     {
@@ -39,31 +95,23 @@ class MailmanGateway implements MailmanGatewayInterface
      * @param $email
      * @param null $name
      * @return bool
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
+     * @throws GuzzleException
      */
-    public function subscribe($list, $email, $name = null)
+    public function subscribe($list, $email, $name = null): bool
     {
-        $subscribee = $email;
-        if ($name !== null) {
-            $subscribee = '"'.$name.'" <'.$email.'>';
-        }
-        $path = 'admin/' . $list . '/members/add';
-        $query = [
-            'subscribe_or_invite' => 0,
-            'send_welcome_msg_to_this_batch' => 0,
-            'send_notifications_to_list_owner' => 0,
-            'subscribees' => $subscribee,
-            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
-        ];
-
-        $response = $this->client->get($path .'?'. http_build_query($query));
-
-        $this->checkResponse($response);
-        $html = $response->getBody()->getContents();
-
-        if (strstr($html, 'Error subscribing:')) {
-            throw new \InvalidArgumentException('Error subscribing: '.$email);
+        $response = $this->_execRawRequest($list, 'POST', 'members', [RequestOptions::FORM_PARAMS => [
+            'list_id' => $list,
+            'subscriber' => $email,
+            'display_name' => $name,
+            'pre_verified' => "true",
+            'pre_confirmed' => "true",
+            'pre_approved' => "true",
+        ]]);
+        switch ($response->getStatusCode()) {
+            case 400:
+                throw new \InvalidArgumentException('Address already exists');
+            case 409:
+                throw new \InvalidArgumentException('Address already a member');
         }
 
         return true;
@@ -73,99 +121,62 @@ class MailmanGateway implements MailmanGatewayInterface
      * @param $list
      * @param $email
      * @return bool
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
+     * @throws GuzzleException
      */
-    public function unsubscribe($list, $email)
+    public function unsubscribe($list, $email): bool
     {
-        $path = 'admin/' . $list . '/members/remove';
-        $query = array(
-            'send_unsub_ack_to_this_batch' => 0,
-            'send_unsub_notifications_to_list_owner' => 0,
-            'unsubscribees' => $email,
-            'adminpw' => config('mailmansync.lists.'.$list.'.password')
-        );
-        $response = $this->client->get($path .'?'. http_build_query($query));
-        $this->checkResponse($response);
-        $html = $response->getBody()->getContents();
+        $membershipId = $this->_getMembershipId($list, $email);
 
-        if (strstr($html, 'Cannot unsubscribe non-members:')) {
-            throw new \InvalidArgumentException('Cannot unsubscribe non-members: '.$email);
-        }
+        $this->_execRequest($list, 'DELETE', 'members/'.strval($membershipId));
 
         return true;
     }
 
-    public function change($list, $emailFrom, $emailTo)
+    /**
+     * @throws GuzzleException
+     */
+    public function change($list, $emailFrom, $emailTo): bool
     {
-        $path = 'admin/' . $list . '/members/change';
-        $query = [
-            'change_from' => $emailFrom,
-            'change_to' => $emailTo,
-            'notice_old' => 0,
-            'notice_new' => 0,
-            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
-        ];
-        $response = $this->client->get($path.'?'.http_build_query($query));
-
-        $this->checkResponse($response);
-        $html = $response->getBody()->getContents();
-
-        if (strstr($html, 'is not a member')) {
-            throw new \InvalidArgumentException($emailFrom.' is not a member');
+        // see if address already exists
+        $response = $this->_execRawRequest($list, 'GET', 'users/'.$emailTo);
+        if ($response->getStatusCode() != 404) {
+            throw new \InvalidArgumentException($emailTo . ' already exists');
         }
-        if (strstr($html, 'is already a list member')) {
-            throw new \InvalidArgumentException($emailTo.' is already a list member');
-        }
+
+        // add the address and verify it
+        $this->_execRequest($list, 'POST', 'users/'.$emailFrom.'/addresses', [RequestOptions::FORM_PARAMS => ['email' => $emailTo]]);
+        $this->_execRequest($list, 'POST', 'addresses/'.$emailTo.'/verify');
+
+        // get the membershipURI needed for the update
+        //http://lists.efnet.org:8001/3.1/addresses/gavin@subnets.org/memberships
+        $membershipId = $this->_getMembershipId($list, $emailFrom);
+
+        //update membership to new address
+        $body = ['address' => $emailTo];
+        $this->_execRequest($list, 'PATCH', 'members/'.strval($membershipId), [RequestOptions::FORM_PARAMS => $body]);
+
         return true;
     }
 
     /**
      * @param $list
      * @return array
+     * @throws GuzzleException
      */
-    public function roster($list)
+    public function roster($list): array
     {
-        $jar = new CookieJar();
-        $path = 'roster/'.$list;
+        // http://lists.efnet.org:8001/3.1/members/find?list_id=admins.voting.efnet.org&role=member
+        $path = 'members/find';
         $query = [
-            'adminpw' => config('mailmansync.lists.'.$list.'.password'),
-            'admlogin' => 'Let me in...',
+            'list_id' => $list,
+            'role' => 'member',
         ];
-        $this->client->request('POST', 'admin/'.$list, ['form_params' => $query, 'cookies' => $jar]);
-
-        $response = $this->client->get(
-            $path,
-            [
-                'cookies' => $jar,
-                'headers' => ['Cookie' => $list.'+admin='.$jar->getCookieByName($list.'+admin')->getValue()]
-            ]
-        );
-
-        $this->checkResponse($response);
-
-        $html = $response->getBody()->getContents();
+        $obj = $this->_execRequest($list, 'GET', $path, [RequestOptions::QUERY => $query]);
 
         $members = [];
-        if (preg_match_all('~<a href="(?:[^"]*)/options/'.$list.'/([^"]+)">([^<]+)</a>~', $html, $m)) {
-            $members = str_replace(' at ', '@', $m[2]);
+        foreach ($obj->entries as $entry) {
+            $members[] = $entry->email;
         }
         return $members;
-    }
-
-    /**
-     * @param ResponseInterface|Response $response
-     */
-    protected function checkResponse(ResponseInterface $response)
-    {
-        if ($response->getStatusCode() === 401) {
-            throw new \InvalidArgumentException('Invalid password');
-        }
-        if ($response->getStatusCode() === 404) {
-            throw new \InvalidArgumentException('Invalid admin url');
-        }
-        if ($response->getStatusCode() !== 200) {
-            throw new \RuntimeException('Unknown error getting unsubscribe page');
-        }
     }
 }

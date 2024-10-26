@@ -1,4 +1,4 @@
-# Sync emails with mailman
+# Sync emails with mailman3
 
 ## Introduction
 
@@ -31,8 +31,8 @@ Register Service Provider in providers array:
 
 Config
 
-    MAILMAN_ADMIN_URL=http://your.host/mailman/
-    MAILMAN_LISTS="{\"examplelist\":{\"password\":\"securepassword\"}}"
+    MAILMAN_ADMIN_URL=http://your.host:8001/3.1/
+    MAILMAN_LISTS="{\"examplelist.domain\":{\"user\":\"restadmin\",\"password\":\"securepassword\"}}"
 
 ## Usage
 

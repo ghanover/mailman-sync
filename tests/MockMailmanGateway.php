@@ -16,11 +16,15 @@ use MailmanSync\MailmanGateway;
 class MockMailmanGateway extends MailmanGateway
 {
     private static $server;
-    public function __construct(Response $response)
+
+    /**
+     * @param Response[] $responses
+     */
+    public function __construct(array $responses)
     {
-        $mock = new MockHandler([
-            $response
-        ]);
+        $mock = new MockHandler(
+            $responses
+        );
 
         $handler = HandlerStack::create($mock);
         parent::__construct(['handler' => $handler]);
