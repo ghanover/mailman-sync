@@ -10,29 +10,27 @@ namespace MailmanSync;
 interface MailmanGatewayInterface
 {
     /**
-     * @param $list
-     * @param $email
-     * @param null $name
-     * @return bool
-     * @throws \RuntimeException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      * @throws \InvalidArgumentException
      */
-    public function subscribe($list, $email, $name = null);
+    public function subscribe(string $list, string $email, ?string $name = null): bool;
 
     /**
-     * @param $list
-     * @param $email
-     * @return bool
-     * @throws \RuntimeException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      * @throws \InvalidArgumentException
      */
-    public function unsubscribe($list, $email);
-
-    public function change($list, $emailFrom, $emailTo);
+    public function unsubscribe(string $list, string $email): bool;
 
     /**
-     * @param $list
-     * @return array
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \InvalidArgumentException
      */
-    public function roster($list);
+    public function change(string $list, string $emailFrom, string $emailTo): bool;
+
+    /**
+     * @return array<int, string>
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \InvalidArgumentException
+     */
+    public function roster(string $list): array;
 }

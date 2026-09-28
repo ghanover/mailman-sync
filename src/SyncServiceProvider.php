@@ -12,39 +12,33 @@ use Illuminate\Support\ServiceProvider;
 class SyncServiceProvider extends ServiceProvider
 {
     /**
-     * Indicates if loading of the provider is deferred.
-     *
-     * @var bool
-     */
-    protected $defer = false;
-
-    /**
      * Bootstrap the application events.
-     *
-     * @return void
      */
-    public function boot()
+    public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../config/mailmansync.php' => config_path('mailmansync.php'),
-        ]);
+            __DIR__.'/../config/mailmansync.php' => config_path('mailmansync.php'),
+        ], 'mailmansync-config');
     }
 
     /**
      * Register the service provider.
-     *
-     * @return void
      */
-    public function register()
+    public function register(): void
     {
-        $this->app->singleton('MailmanSync', function ($app) {
-            if (config('mailmansync.mock')) {
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/mailmansync.php',
+            'mailmansync'
+        );
+
+        $this->app->singleton(MailmanGatewayInterface::class, function () {
+            if (filter_var(config('mailmansync.mock'), FILTER_VALIDATE_BOOLEAN)) {
                 return new MailmanGatewayMock();
             }
+
             return new MailmanGateway();
         });
-        $this->mergeConfigFrom(
-            __DIR__ . '/../config/mailmansync.php', 'mailmansync'
-        );
+
+        $this->app->alias(MailmanGatewayInterface::class, 'MailmanSync');
     }
 }

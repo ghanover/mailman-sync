@@ -12,77 +12,73 @@ use Illuminate\Support\Facades\Storage;
 class MailmanGatewayMock implements MailmanGatewayInterface
 {
     /**
-     * @var array
+     * @var array<string, array<int, string>>
      */
-    private static $mockCache = [];
+    private static array $mockCache = [];
 
-    /**
-     * @param $list
-     * @param $email
-     * @param null $name
-     * @return bool
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
-     */
-    public function subscribe($list, $email, $name = null)
+    public function subscribe(string $list, string $email, ?string $name = null): bool
     {
         $this->getCache($list);
         self::$mockCache[$list][] = $email;
         $this->writeCache($list);
+
         return true;
     }
 
-    /**
-     * @param $list
-     * @param $email
-     * @return bool
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
-     */
-    public function unsubscribe($list, $email)
+    public function unsubscribe(string $list, string $email): bool
     {
-        self::$mockCache[$list] = array_filter(
+        self::$mockCache[$list] = array_values(array_filter(
             $this->getCache($list),
-            function ($v) use ($email) {return $v !== $email;}
-        );
+            static fn (string $address): bool => $address !== $email
+        ));
         $this->writeCache($list);
+
         return true;
     }
 
-    public function change($list, $emailFrom, $emailTo)
+    public function change(string $list, string $emailFrom, string $emailTo): bool
     {
-
         self::$mockCache[$list] = array_map(
-            function ($v) use ($emailFrom, $emailTo) {return $v === $emailFrom ? $emailTo : $v;},
+            static fn (string $address): string => $address === $emailFrom ? $emailTo : $address,
             $this->getCache($list)
         );
         $this->writeCache($list);
+
         return true;
     }
 
     /**
-     * @param $list
-     * @return array
+     * @return array<int, string>
      */
-    public function roster($list)
+    public function roster(string $list): array
     {
         return $this->getCache($list);
     }
 
-    private function getCache($list)
+    /**
+     * @return array<int, string>
+     */
+    private function getCache(string $list): array
     {
-        if (empty(self::$mockCache[$list]) && Storage::disk('local')->exists('mockCache.'.$list.'.txt')) {
-            self::$mockCache[$list] = array_filter(
-                explode(PHP_EOL, Storage::disk('local')->get('mockCache.'.$list.'.txt'))
-            );
-        } else {
-            self::$mockCache[$list] = [];
+        if (! array_key_exists($list, self::$mockCache)) {
+            $file = 'mockCache.'.$list.'.txt';
+            if (Storage::disk('local')->exists($file)) {
+                self::$mockCache[$list] = array_values(array_filter(
+                    explode(PHP_EOL, (string) Storage::disk('local')->get($file))
+                ));
+            } else {
+                self::$mockCache[$list] = [];
+            }
         }
+
         return self::$mockCache[$list];
     }
 
-    private function writeCache($list)
+    private function writeCache(string $list): void
     {
-        Storage::disk('local')->put('mockCache.'.$list.'.txt', implode(PHP_EOL, self::$mockCache[$list]));
+        Storage::disk('local')->put(
+            'mockCache.'.$list.'.txt',
+            implode(PHP_EOL, self::$mockCache[$list])
+        );
     }
 }
