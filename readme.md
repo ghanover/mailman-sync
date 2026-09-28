@@ -2,46 +2,43 @@
 
 ## Introduction
 
-Basic subscribe/unsubscribe functionality to allow for keeping user lists in sync with a mailman list
+Basic subscribe/unsubscribe functionality to allow for keeping user lists in sync with a mailman list.
+
+## Requirements
+
+- PHP 8.2 or newer (including PHP 8.4)
+- Laravel 11
 
 ## Installation
 
-Require through composer (until I get off my butt and get it in packagist, you'll have to add the VCS manually)
+```bash
+composer require ghanover/mailman-sync
+php artisan vendor:publish --tag=mailmansync-config
+```
 
-	composer require ghanover/mailman-sync
+Laravel discovers the service provider and the `MailmanGateway` facade automatically. If discovery is disabled, register `MailmanSync\SyncServiceProvider` in `bootstrap/providers.php` and import `MailmanSync\Facades\MailmanGateway` where you call it.
 
-Or manually edit your composer.json file:
+### Configuration
 
-	"require": {
-		"ghanover/mailman-sync": "dev-master"
-	}
+```
+MAILMAN_ADMIN_URL=http://your.host:8001/3.1/
+MAILMAN_LISTS="{\"examplelist.domain\":{\"user\":\"restadmin\",\"password\":\"securepassword\"}}"
+```
 
-Publish the configuration file:
-
-	php artisan vendor:publish
-
-##### app/config.php
-Edit the aliases array to include:
-
-	'MailmanGateway' => \MailmanSync\Facades\MailmanGateway::class,
-
-Register Service Provider in providers array:
-
-    \MailmanSync\SyncServiceProvider::class,
-
-Config
-
-    MAILMAN_ADMIN_URL=http://your.host:8001/3.1/
-    MAILMAN_LISTS="{\"examplelist.domain\":{\"user\":\"restadmin\",\"password\":\"securepassword\"}}"
+Set `MAILMAN_MOCK=true` to store list membership in `storage/app` instead of calling Mailman. The mock does not simulate API failures.
 
 ## Usage
 
-### Basic example
+```php
+MailmanGateway::subscribe('mylist', 'user@example.com');
+```
 
-	MailmanGateway::subscribe('mylist', 'user@example.com');
+The same gateway is available from the container as `MailmanSync\MailmanGatewayInterface`. When `MAILMAN_MOCK` is enabled, that binding is the file-backed mock.
+
+A custom implementation of that interface must use the same typed signatures: `string` arguments, `bool` returns from `subscribe`, `unsubscribe`, and `change`, and an `array` return from `roster`.
 
 ## Testing
 
-You can test locally without having to set up mailman by adding MAILMAN_MOCK=true to your .env. This will use local files in storage/app/ to mimic the members list. 
-
-At this point in time, the mock feature has no way to test failures.
+```bash
+composer test
+```

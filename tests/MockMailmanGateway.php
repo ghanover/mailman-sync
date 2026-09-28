@@ -7,7 +7,6 @@
  */
 namespace MailmanSync\Test;
 
-use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
@@ -15,17 +14,12 @@ use MailmanSync\MailmanGateway;
 
 class MockMailmanGateway extends MailmanGateway
 {
-    private static $server;
-
     /**
-     * @param Response[] $responses
+     * @param array<int, Response> $responses
      */
     public function __construct(array $responses)
     {
-        $mock = new MockHandler(
-            $responses
-        );
-
+        $mock = new MockHandler($responses);
         $handler = HandlerStack::create($mock);
         parent::__construct(['handler' => $handler]);
     }

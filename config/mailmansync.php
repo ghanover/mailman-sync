@@ -5,7 +5,7 @@ if (env('MAILMAN_LISTS')) {
 }
 return [
     'url' => env('MAILMAN_ADMIN_URL', 'http://localhost:8001/3.1'),
-    'mock' => env('MAILMAN_MOCK', false),
+    'mock' => filter_var(env('MAILMAN_MOCK', false), FILTER_VALIDATE_BOOLEAN),
     'lists' => $lists ?: [
         'list.example.com' => [
             'user' => 'restadmin',
